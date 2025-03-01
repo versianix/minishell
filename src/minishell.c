@@ -8,23 +8,23 @@ int main(void) {
 
     write(STDOUT_FILENO, begin, sizeof(begin) - 1);
 
-    while(true) {
+    while (true) {
 
         write(STDOUT_FILENO, prompt, sizeof(prompt) - 1);
         char buffer[BUFFER_SIZE]; // buffer for the command line
         char **envp = {NULL}; // environment variables
 
-        if(!fgets(buffer, BUFFER_SIZE, stdin)) {
+        if (!fgets(buffer, BUFFER_SIZE, stdin)) {
             // if user pressed Ctrl-D, exit the program
             write(STDOUT_FILENO, "\n", 1);
             break;
         }
 
         size_t len = strlen(buffer);
-        if(len > 0 && buffer[len - 1] == '\n') {
+        if (len > 0 && buffer[len - 1] == '\n') {
             buffer[len - 1] = '\0';
         }
-        if(strlen(buffer) == 0) {
+        if (strlen(buffer) == 0) {
             continue; // if the user pressed enter without typing anything
         }
 
@@ -34,7 +34,7 @@ int main(void) {
         token = strtok(buffer, "|");
 
         // store commands between pipes
-        while(token != NULL && num_commands < MAX_ARG) {
+        while (token != NULL && num_commands < MAX_ARG) {
             commands[num_commands++] = strdup(token);
             token = strtok(NULL, "|");
         }
@@ -42,45 +42,45 @@ int main(void) {
 
         // create necessary pipes
         int pipes[MAX_PIPES][2]; // array of pipe descriptors
-        for(int i = 0; i < num_commands - 1; i++) {
-            if(pipe(pipes[i]) < 0) {
+        for (int i = 0; i < num_commands - 1; i++) {
+            if (pipe(pipes[i]) < 0) {
                 perror("Pipe failed.\n");
                 exit(1);
             }
         }
 
         t_command cmds[MAX_PIPES]; // array of parsed commands
-        for(int i = 0; i < num_commands; i++) {
+        for (int i = 0; i < num_commands; i++) {
             parse_command(commands[i], &cmds[i]);
         }
 
         // fork and execute each command
-        for(int i = 0; i < num_commands; i++) {
+        for (int i = 0; i < num_commands; i++) {
             pid_t pid_cmd = fork();
-            if(pid_cmd < 0) {
+            if (pid_cmd < 0) {
                 perror("Fork failed.\n");
                 exit(1);
             }
-            else if(pid_cmd == 0) {
+            else if (pid_cmd == 0) {
                 // child process
                 // if not the first command, read from previous pipe
-                if(i > 0) {
+                if (i > 0) {
                     dup2(pipes[i - 1][0], STDIN_FILENO);
                 }
                 // if not the last command, write to the next pipe  
-                if(i < num_commands - 1) {
+                if (i < num_commands - 1) {
                     dup2(pipes[i][1], STDOUT_FILENO);
                 }
                 // close all pipe fds in child process to avoid leaks
-                for(int j = 0; j < num_commands - 1; j++) {
+                for (int j = 0; j < num_commands - 1; j++) {
                     close(pipes[j][0]);
                     close(pipes[j][1]);
                 }
 
                 // redirect input/output if necessary
-                if(cmds[i].infile) {
+                if (cmds[i].infile) {
                     int fd = open(cmds[i].infile, O_RDONLY);
-                    if(fd < 0) {
+                    if (fd < 0) {
                         perror("Input file not found, try again.\n");
                         exit(1);
                     }
@@ -88,10 +88,10 @@ int main(void) {
                     close(fd);
                 }
 
-                if(cmds[i].outfile) {
+                if (cmds[i].outfile) {
                     int flags = O_WRONLY | O_CREAT | (cmds[i].append ? O_APPEND : O_TRUNC);
                     int fd = open(cmds[i].outfile, flags, 0644);
-                    if(fd < 0) {
+                    if (fd < 0) {
                         perror("Output file not found, try again.\n");
                         exit(1);
                     }
@@ -100,32 +100,31 @@ int main(void) {
                 }
 
                 // execute command
-                if(access(cmds[i].argv[0], F_OK) == 0) {
-                execve(cmds[i].argv[0], cmds[i].argv, envp);
-                close(1);
-                close(0);
-                }
-                else {
-                    perror("Command/Path for execution not found.\n");
+                char *command_path = find_executable(cmds[i].argv[0]);
+                if (!command_path) {
+                    perror("Command not found.\n");
                     exit(1);
                 }
+                execve(command_path, cmds[i].argv, envp);
+                perror("Execve failed.\n");
+                exit(1);
             }
             else {
                 // parent process
                 // close pipe file descriptors
-                if(i > 0) {
+                if (i > 0) {
                     close(pipes[i - 1][0]);
                     close(pipes[i - 1][1]);
                 }
             }
         }
 
-        for(int i = 0; i < num_commands; i++) {
+        for (int i = 0; i < num_commands; i++) {
             wait(NULL);
         }
 
         // free memory
-        for(int i = 0; i < num_commands; i++) {
+        for (int i = 0; i < num_commands; i++) {
             free(commands[i]);
         }
     };
