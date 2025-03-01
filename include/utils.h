@@ -26,5 +26,6 @@ typedef struct s_command {
 char *find_executable(char *cmd); // function to find the executable path
 char *trim_whitespaces(char *token); // function to remove leading and trailing whitespaces
 void parse_command(char *cmd, t_command *parsed_cmd); // function to parse command line
+int handle_builtin(t_command *cmd); // function to handle built-in commands
 
 #endif // UTILS_H
