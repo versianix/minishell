@@ -74,3 +74,39 @@ char *find_executable(char *cmd) {
     free(path_copy);
     return NULL; // if the command is not found
 }
+
+int handle_builtin(t_command *cmd) {
+    if (strcmp(cmd->argv[0], "exit") == 0) {
+        printf("Exiting minishell...\n");
+        exit(0);
+    }
+
+    if (strcmp(cmd->argv[0], "cd") == 0) {
+        if (cmd->argv[1] == NULL) {
+            fprintf(stderr, "cd: Missing directory argument\n");
+        } else if (chdir(cmd->argv[1]) != 0) {
+            perror("Error changing directory");
+        }
+        return 1;
+    }
+
+    if (strcmp(cmd->argv[0], "pwd") == 0) {
+        char cwd[BUFFER_SIZE];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            printf("%s\n", cwd);
+        } else {
+            perror("Error getting current directory");
+        }
+        return 1;
+    }
+
+    if (strcmp(cmd->argv[0], "echo") == 0) {
+        for (int i = 1; cmd->argv[i] != NULL; i++) {
+            printf("%s ", cmd->argv[i]);
+        }
+        printf("\n");
+        return 1;
+    }
+
+    return 0;
+}
