@@ -1,5 +1,3 @@
-#include <stdbool.h>
-#include <unistd.h>
 #include "../include/utils.h"
 
 char *trim_whitespaces(char *token) {
