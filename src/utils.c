@@ -1,12 +1,12 @@
 #include "../include/utils.h"
 
 char *trim_whitespaces(char *token) {
-    // Remove leading whitespace characters
+    // remove leading whitespace characters
     while (*token && isspace(*token)) {
         token++;
     }
 
-    // Remove trailing whitespace characters
+    // remove trailing whitespace characters
     char* end = token + strlen(token) - 1;
     while (end > token && isspace(*end)) {
         end--;
@@ -47,4 +47,30 @@ void parse_command(char *cmd, t_command *parsed_cmd) {
         token = strtok(NULL, " \n");
     }
     parsed_cmd->argv[arg_index] = NULL;
+}
+
+char *find_executable(char *cmd) {
+    if (access(cmd, X_OK) == 0) { // if it's an absolute path
+        return strdup(cmd);
+    }
+
+    char *path = getenv("PATH");
+    if (!path) return NULL;
+
+    char *path_copy = strdup(path); // makes a copy of the PATH variable
+    char *dir = strtok(path_copy, ":"); // directories are separated by ':'
+    char full_path[MAX_PATH];
+
+    while (dir) {
+        // format the full path to the command
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir, cmd);
+        if (access(full_path, X_OK) == 0) { // if it's an executable file
+            free(path_copy);
+            return strdup(full_path);
+        }
+        dir = strtok(NULL, ":");
+    }
+
+    free(path_copy);
+    return NULL; // if the command is not found
 }
