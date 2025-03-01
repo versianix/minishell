@@ -14,14 +14,20 @@
 #define MAX_PIPES 8 // max number of pipes in a command line
 #define BUFFER_SIZE 256 // max number of characters in a command line
 
+typedef struct s_command {
+    char  *argv[MAX_ARG];
+    char  *infile;
+    char  *outfile;
+    bool  append;
+} t_command;
+
 char *trim_whitespaces(char *token); // function to remove leading and trailing whitespaces
+void parse_command(char *cmd, t_command *parsed_cmd); // function to parse command line
 
 int main(void) {
 
     char begin[] = "Welcome to my mini-shell!\n";
     char prompt[] = "cmd> ";
-    char *input_symbol = "<";
-    char *output_symbol = ">";
     char *token;
 
     write(STDOUT_FILENO, begin, sizeof(begin) - 1);
@@ -30,7 +36,6 @@ int main(void) {
 
         write(STDOUT_FILENO, prompt, sizeof(prompt) - 1);
         char buffer[BUFFER_SIZE]; // buffer for the command line
-        char *argv[MAX_ARG]; // array of arguments for execve
         char **envp = {NULL}; // environment variables
 
         if(!fgets(buffer, BUFFER_SIZE, stdin)) {
@@ -68,6 +73,11 @@ int main(void) {
             }
         }
 
+        t_command cmds[MAX_PIPES]; // array of parsed commands
+        for(int i = 0; i < num_commands; i++) {
+            parse_command(commands[i], &cmds[i]);
+        }
+
         // fork and execute each command
         for(int i = 0; i < num_commands; i++) {
             pid_t pid_cmd = fork();
@@ -91,50 +101,31 @@ int main(void) {
                     close(pipes[j][1]);
                 }
 
-                // set up input/output redirections for files
-                for(int j = 0; commands[i][j] != '\0'; j++) {
-
-                    if(commands[i][j] == *input_symbol) {
-                        char *input_path = &commands[i][j + 1];
-                        input_path = trim_whitespaces(input_path);
-                        int fd = open(input_path, O_RDONLY);
-                        if(fd < 0) {
-                            perror("Input file not found, try again.\n");
-                            exit(1);
-                        }
-                        dup2(fd, 0);
-                        close(fd);
+                // redirect input/output if necessary
+                if(cmds[i].infile) {
+                    int fd = open(cmds[i].infile, O_RDONLY);
+                    if(fd < 0) {
+                        perror("Input file not found, try again.\n");
+                        exit(1);
                     }
-                    if(commands[i][j] == *output_symbol) {
-                        char *output_path = &commands[i][j + 1];
-                        output_path = trim_whitespaces(output_path);
-                        int fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                        if(fd < 0) {
-                            perror("Output file not found, try again.\n");
-                            exit(1);
-                        }
-                        dup2(fd, 1);
-                        close(fd);
-                    }
+                    dup2(fd, STDIN_FILENO);
+                    close(fd);
                 }
 
-                // fill argv array with command path and arguments
-                int arg_index = 0;
-                char *command_path = strtok(commands[i], " \n");
-                argv[arg_index++] = command_path;
-                token = command_path;
-                while((token = strtok(NULL, " \n")) != NULL && arg_index < MAX_ARG - 1) {
-                    if(strcmp(token, input_symbol) == 0 || strcmp(token, output_symbol) == 0) {
-                        arg_index++;
-                        break;
+                if(cmds[i].outfile) {
+                    int flags = O_WRONLY | O_CREAT | (cmds[i].append ? O_APPEND : O_TRUNC);
+                    int fd = open(cmds[i].outfile, flags, 0644);
+                    if(fd < 0) {
+                        perror("Output file not found, try again.\n");
+                        exit(1);
                     }
-                    argv[arg_index++] = token;
+                    dup2(fd, STDOUT_FILENO);
+                    close(fd);
                 }
-                argv[arg_index] = NULL;
 
                 // execute command
-                if(access(command_path, F_OK) == 0) {
-                execve(command_path, argv, envp);
+                if(access(cmds[i].argv[0], F_OK) == 0) {
+                execve(cmds[i].argv[0], cmds[i].argv, envp);
                 close(1);
                 close(0);
                 }
@@ -184,4 +175,37 @@ char *trim_whitespaces(char *token) {
     *(end + 1) = '\0';
 
     return token;
+}
+
+void parse_command(char *cmd, t_command *parsed_cmd) {
+    memset(parsed_cmd, 0, sizeof(t_command)); // inicialize struct with zeros
+
+    char *token = strtok(cmd, " \n");
+    int arg_index = 0;
+
+    while (token != NULL && arg_index < MAX_ARG - 1) {
+        if (strcmp(token, "<") == 0) {  // input redirection
+            token = strtok(NULL, " \n");
+            if (token) parsed_cmd->infile = strdup(token);
+        }
+        else if (strcmp(token, ">") == 0) {  // output redirection (truncate)
+            token = strtok(NULL, " \n");
+            if (token) {
+                parsed_cmd->outfile = strdup(token);
+                parsed_cmd->append = false;
+            }
+        }
+        else if (strcmp(token, ">>") == 0) {  // output redirection (append)
+            token = strtok(NULL, " \n");
+            if (token) {
+                parsed_cmd->outfile = strdup(token);
+                parsed_cmd->append = true;
+            }
+        }
+        else {  // command arguments
+            parsed_cmd->argv[arg_index++] = token;
+        }
+        token = strtok(NULL, " \n");
+    }
+    parsed_cmd->argv[arg_index] = NULL;
 }
