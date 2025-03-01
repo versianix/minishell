@@ -1,28 +1,4 @@
-// This code was generated on a MacOS, maybe the libraries
-// required are different on other OS.
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <ctype.h>
-
-#define MAX_ARG 16 // max number of flags after a command path
-#define MAX_PIPES 8 // max number of pipes in a command line
-#define BUFFER_SIZE 256 // max number of characters in a command line
-
-typedef struct s_command {
-    char  *argv[MAX_ARG];
-    char  *infile;
-    char  *outfile;
-    bool  append;
-} t_command;
-
-char *trim_whitespaces(char *token); // function to remove leading and trailing whitespaces
-void parse_command(char *cmd, t_command *parsed_cmd); // function to parse command line
+#include "../include/utils.h"
 
 int main(void) {
 
@@ -155,57 +131,4 @@ int main(void) {
     };
 
     return 0; 
-}
-
-
-
-// Auxiliary functions
-
-char *trim_whitespaces(char *token) {
-    // Remove leading whitespace characters
-    while (*token && isspace(*token)) {
-        token++;
-    }
-
-    // Remove trailing whitespace characters
-    char* end = token + strlen(token) - 1;
-    while (end > token && isspace(*end)) {
-        end--;
-    }
-    *(end + 1) = '\0';
-
-    return token;
-}
-
-void parse_command(char *cmd, t_command *parsed_cmd) {
-    memset(parsed_cmd, 0, sizeof(t_command)); // inicialize struct with zeros
-
-    char *token = strtok(cmd, " \n");
-    int arg_index = 0;
-
-    while (token != NULL && arg_index < MAX_ARG - 1) {
-        if (strcmp(token, "<") == 0) {  // input redirection
-            token = strtok(NULL, " \n");
-            if (token) parsed_cmd->infile = strdup(token);
-        }
-        else if (strcmp(token, ">") == 0) {  // output redirection (truncate)
-            token = strtok(NULL, " \n");
-            if (token) {
-                parsed_cmd->outfile = strdup(token);
-                parsed_cmd->append = false;
-            }
-        }
-        else if (strcmp(token, ">>") == 0) {  // output redirection (append)
-            token = strtok(NULL, " \n");
-            if (token) {
-                parsed_cmd->outfile = strdup(token);
-                parsed_cmd->append = true;
-            }
-        }
-        else {  // command arguments
-            parsed_cmd->argv[arg_index++] = token;
-        }
-        token = strtok(NULL, " \n");
-    }
-    parsed_cmd->argv[arg_index] = NULL;
 }
