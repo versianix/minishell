@@ -52,10 +52,14 @@ int main(void) {
         t_command cmds[MAX_PIPES]; // array of parsed commands
         for (int i = 0; i < num_commands; i++) {
             parse_command(commands[i], &cmds[i]);
-        }
+        }         
 
         // fork and execute each command
         for (int i = 0; i < num_commands; i++) {
+            if (handle_builtin(&cmds[i])) {
+                continue;
+            }
+            
             pid_t pid_cmd = fork();
             if (pid_cmd < 0) {
                 perror("Fork failed.\n");
