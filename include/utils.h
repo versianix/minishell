@@ -14,6 +14,7 @@
 #define MAX_ARG 16 // max number of flags after a command path
 #define MAX_PIPES 8 // max number of pipes in a command line
 #define BUFFER_SIZE 256 // max number of characters in a command line
+#define MAX_PATH 1024 // max number of characters in a path
 
 typedef struct s_command {
     char  *argv[MAX_ARG];
@@ -22,6 +23,7 @@ typedef struct s_command {
     bool  append;
 } t_command;
 
+char *find_executable(char *cmd); // function to find the executable path
 char *trim_whitespaces(char *token); // function to remove leading and trailing whitespaces
 void parse_command(char *cmd, t_command *parsed_cmd); // function to parse command line
 
